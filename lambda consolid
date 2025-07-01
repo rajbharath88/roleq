@@ -1,0 +1,27 @@
+import pandas as pd
+
+# Re-defining roles since the environment was reset
+roles_role1 = [
+    "ecs:*",
+    "iam:*",
+    "elasticloadbalancing:*",
+    "cloudwatch:*",
+    "logs:*",
+    "events:*",
+    "ssm:*",
+    "autoscaling:*",
+    "application-autoscaling:*",
+    "servicediscovery:*",
+    "route53:*",
+    "kms:*",
+    "s3:*"
+]
+
+# Creating a DataFrame
+df_role1 = pd.DataFrame(roles_role1, columns=["IAM Role/Service Permission"])
+
+# Saving as Excel
+file_path_role1 = '/mnt/data/ecs_fargate_spinnaker_roles_role1.xlsx'
+df_role1.to_excel(file_path_role1, index=False)
+
+file_path_role1
