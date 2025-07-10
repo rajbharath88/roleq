@@ -1,30 +1,32 @@
 import boto3
 import pandas as pd
 
-# Config
-excel_file = 'log_groups.xlsx'
-sheet_name = 'Sheet1'
-region = 'us-east-1'
+# === CONFIGURATION ===
+excel_file = 'log_groups.xlsx'   # Path to your Excel file
+sheet_name = 'Sheet1'            # Change if needed
+region = 'us-east-1'             # Change to the correct AWS region
 
-# Initialize boto3
-client = boto3.client('logs', region_name=region)
-
-# Load Excel
+# === READ LOG GROUPS FROM EXCEL ===
 df = pd.read_excel(excel_file, sheet_name=sheet_name, engine='openpyxl')
 
-# Clean and extract log group names
+# Clean log group names
 log_groups = df.iloc[:, 0].dropna().astype(str).str.strip().tolist()
-log_groups = [lg for lg in log_groups if lg.lower() != "loggroup" and lg != ""]
+log_groups = [lg for lg in log_groups if lg.lower() != 'loggroup' and lg != '']
 
-# Log existing log groups for reference
-print("📋 Existing log groups in region", region)
-existing_groups = client.describe_log_groups()['logGroups']
-existing_names = [g['logGroupName'] for g in existing_groups]
-for name in existing_names:
-    print("-", name)
+# === INITIALIZE BOTO3 CLIENT ===
+client = boto3.client('logs', region_name=region)
 
-# Proceed to deletion
-print("\n🚮 Starting deletion process")
+# === GET ALL EXISTING LOG GROUPS WITH PAGINATION ===
+paginator = client.get_paginator('describe_log_groups')
+existing_names = []
+
+for page in paginator.paginate():
+    for group in page['logGroups']:
+        existing_names.append(group['logGroupName'])
+
+print(f"🔍 Found {len(existing_names)} total log groups in region {region}.\n")
+
+# === DELETE MATCHING LOG GROUPS ===
 for log_group in log_groups:
     if log_group in existing_names:
         try:
@@ -33,10 +35,4 @@ for log_group in log_groups:
         except Exception as e:
             print(f"❌ Error deleting {log_group}: {e}")
     else:
-        print(f"⚠️ Not found or region mismatch: {log_group}")
-
-# Final check
-print("\n📋 Remaining log groups:")
-remaining_groups = client.describe_log_groups()['logGroups']
-for g in remaining_groups:
-    print("-", g['logGroupName'])
+        print(f"⚠️ Not found (or region mismatch): {log_group}")
