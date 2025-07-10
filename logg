@@ -1,0 +1,25 @@
+import boto3
+import pandas as pd
+
+# Update this with your Excel file path
+excel_file = 'log_groups.xlsx'
+sheet_name = 'Sheet1'  # Change if needed
+
+# Read the Excel file
+df = pd.read_excel(excel_file, sheet_name=sheet_name)
+
+# Assuming log group names are in the first column
+log_groups = df.iloc[:, 0].dropna().tolist()
+
+# Initialize boto3 client
+client = boto3.client('logs')
+
+# Loop through and delete each log group
+for log_group in log_groups:
+    try:
+        print(f"Deleting log group: {log_group}")
+        client.delete_log_group(logGroupName=log_group)
+    except client.exceptions.ResourceNotFoundException:
+        print(f"Log group not found: {log_group}")
+    except Exception as e:
+        print(f"Error deleting {log_group}: {str(e)}")
