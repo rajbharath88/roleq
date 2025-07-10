@@ -6,6 +6,7 @@ excel_file = 'log_groups.xlsx'
 sheet_name = 'Sheet1'  # Change if needed
 
 # Read the Excel file
+df = pd.read_excel(excel_file, sheet_name=sheet_name, engine='openpyxl')
 df = pd.read_excel(excel_file, sheet_name=sheet_name)
 
 # Assuming log group names are in the first column
