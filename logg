@@ -1,26 +1,42 @@
 import boto3
 import pandas as pd
 
-# Update this with your Excel file path
+# Config
 excel_file = 'log_groups.xlsx'
-sheet_name = 'Sheet1'  # Change if needed
+sheet_name = 'Sheet1'
+region = 'us-east-1'
 
-# Read the Excel file
+# Initialize boto3
+client = boto3.client('logs', region_name=region)
+
+# Load Excel
 df = pd.read_excel(excel_file, sheet_name=sheet_name, engine='openpyxl')
-#df = pd.read_excel(excel_file, sheet_name=sheet_name)
 
-# Assuming log group names are in the first column
-log_groups = df.iloc[:, 0].dropna().tolist()
+# Clean and extract log group names
+log_groups = df.iloc[:, 0].dropna().astype(str).str.strip().tolist()
+log_groups = [lg for lg in log_groups if lg.lower() != "loggroup" and lg != ""]
 
-# Initialize boto3 client
-client = boto3.client('logs')
+# Log existing log groups for reference
+print("📋 Existing log groups in region", region)
+existing_groups = client.describe_log_groups()['logGroups']
+existing_names = [g['logGroupName'] for g in existing_groups]
+for name in existing_names:
+    print("-", name)
 
-# Loop through and delete each log group
+# Proceed to deletion
+print("\n🚮 Starting deletion process")
 for log_group in log_groups:
-    try:
-        print(f"Deleting log group: {log_group}")
-        client.delete_log_group(logGroupName=log_group)
-    except client.exceptions.ResourceNotFoundException:
-        print(f"Log group not found: {log_group}")
-    except Exception as e:
-        print(f"Error deleting {log_group}: {str(e)}")
+    if log_group in existing_names:
+        try:
+            client.delete_log_group(logGroupName=log_group)
+            print(f"✅ Deleted: {log_group}")
+        except Exception as e:
+            print(f"❌ Error deleting {log_group}: {e}")
+    else:
+        print(f"⚠️ Not found or region mismatch: {log_group}")
+
+# Final check
+print("\n📋 Remaining log groups:")
+remaining_groups = client.describe_log_groups()['logGroups']
+for g in remaining_groups:
+    print("-", g['logGroupName'])
