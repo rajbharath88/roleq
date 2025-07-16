@@ -4,35 +4,27 @@ import re
 logs_client = boto3.client('logs')
 
 def lambda_handler(event, context):
-    # Sample input (as passed in the event)
-    # {
-    #   "log_group_arns": [
-    #     "arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/sample-function",
-    #     "arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/another-function"
-    #   ]
-    # }
+    # Paste all your ARNs here (one per line, no quotes or commas)
+    raw_arns = """
+arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/sample-function
+arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/another-function
+arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/my-function:dev
+arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/job-runner
+    """.strip()
 
-    log_group_arns = event.get("log_group_arns", [])
-    
-    if not log_group_arns:
-        return {
-            'statusCode': 200,
-            'body': 'No log group ARNs specified for deletion'
-        }
-
+    log_group_arns = [line.strip() for line in raw_arns.splitlines() if line.strip()]
     deleted_count = 0
 
     for arn in log_group_arns:
         try:
-            # Extract the log group name from the ARN
-            match = re.match(r'arn:aws:logs:[^:]+:[^:]+:log-group:([^:]+)', arn)
+            # Extract the log group name from ARN
+            match = re.match(r'arn:aws:logs:[^:]+:[^:]+:log-group:(.+)', arn)
             if not match:
                 print(f"Invalid ARN format: {arn}")
                 continue
 
             log_group_name = match.group(1)
 
-            # Attempt to delete the log group
             logs_client.delete_log_group(logGroupName=log_group_name)
             print(f"Deleted log group: {log_group_name}")
             deleted_count += 1
