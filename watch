@@ -1,0 +1,36 @@
+import boto3
+import re
+
+logs_client = boto3.client('logs')
+
+def lambda_handler(event, context):
+    log_group_arns = event.get('log_group_arns', [])
+    
+    if not log_group_arns:
+        return {'statusCode': 200, 'body': 'No log group ARNs specified for deletion'}
+
+    deleted_count = 0
+
+    for arn in log_group_arns:
+        try:
+            # Extract log group name from ARN
+            match = re.match(r'arn:aws:logs:[^:]+:[^:]+:log-group:([^:]+)', arn)
+            if not match:
+                print(f"Invalid ARN format: {arn}")
+                continue
+            log_group_name = match.group(1)
+
+            # Attempt to delete the log group
+            logs_client.delete_log_group(logGroupName=log_group_name)
+            print(f'Deleted log group: {log_group_name}')
+            deleted_count += 1
+
+        except logs_client.exceptions.ResourceNotFoundException:
+            print(f"Log group not found: {log_group_name}")
+        except Exception as e:
+            print(f"Error deleting {log_group_name}: {str(e)}")
+
+    return {
+        'statusCode': 200,
+        'body': f'Deleted {deleted_count} log group(s)'
+    }
