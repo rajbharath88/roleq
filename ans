@@ -1,0 +1,43 @@
+---
+# Adds ansible and admin users to the target host
+- name: Create s_ansible user
+  user:
+    name: s_ansible
+    comment: "WU Ansible System Account"
+    uid: 9001
+    shell: /bin/bash
+    create_home: yes
+    home: /home/s_ansible
+
+- name: Create wuawsadmin user
+  user:
+    name: wuawsadmin
+    comment: "System user to manage PrivX roles"
+    uid: 9002
+    shell: /bin/bash
+    create_home: yes
+    home: /home/wuawsadmin
+
+- name: Add the s_ansible ssh pub key
+  authorized_key: user='{{item}}' key="{{ lookup('file', 's_ansible_id_rsa.pub') }}"
+  with_items:
+    - s_ansible
+    - wuawsadmin
+
+- name: Add user to sudo
+  lineinfile:
+    path: /etc/sudoers.d/{{item}}
+    line: '{{item}} ALL=(ALL) NOPASSWD: ALL'
+    state: present
+    mode: 0440
+    create: yes
+    validate: 'visudo -cf %s'
+  with_items:
+    - s_ansible
+    - wuawsadmin
+    
+- name: Change password expiration for wuawsadmin user
+  shell: chage -I -1 -m 0 -M 99999 -E -1 {{item}}
+  with_items:
+    - s_ansible
+    - wuawsadmin
