@@ -1,1 +1,49 @@
+#!/bin/bash
 
+# === CONFIGURATION ===
+FILE="volume_ids.txt"      # Input file containing EBS volume IDs (one per line)
+DRY_RUN=true               # Set to 'true' for testing (no actual deletion), 'false' to delete
+REGIONS=$(aws ec2 describe-regions --query "Regions[*].RegionName" --output text)
+
+# === VALIDATION ===
+if [ ! -f "$FILE" ]; then
+  echo "[ERROR] File '$FILE' not found. Please create it with one Volume ID per line."
+  exit 1
+fi
+
+# === PROCESSING ===
+while read -r VOLUME_ID; do
+  # Skip empty lines or commented lines
+  [[ -z "$VOLUME_ID" || "$VOLUME_ID" =~ ^# ]] && continue
+
+  FOUND=0
+
+  for REGION in $REGIONS; do
+    # Try to describe the volume in the region
+    VOLUME_DESC=$(aws ec2 describe-volumes \
+      --region "$REGION" \
+      --volume-ids "$VOLUME_ID" 2>/dev/null)
+
+    if [[ -n "$VOLUME_DESC" && "$VOLUME_DESC" != "null" ]]; then
+      STATE=$(echo "$VOLUME_DESC" | jq -r '.Volumes[0].State')
+
+      if [[ "$STATE" == "available" ]]; then
+        if $DRY_RUN; then
+          echo "[DRY-RUN] Would delete volume $VOLUME_ID in region $REGION (state: $STATE)"
+        else
+          echo "[ACTION] Deleting volume $VOLUME_ID in region $REGION (state: $STATE)"
+          aws ec2 delete-volume --region "$REGION" --volume-id "$VOLUME_ID"
+        fi
+      else
+        echo "[SKIP] Volume $VOLUME_ID in $REGION is in state '$STATE', not 'available'"
+      fi
+      FOUND=1
+      break
+    fi
+  done
+
+  if [[ $FOUND -eq 0 ]]; then
+    echo "[WARN] Volume $VOLUME_ID not found in any region"
+  fi
+
+done < "$FILE"
