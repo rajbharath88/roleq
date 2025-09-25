@@ -1,0 +1,138 @@
+
+
+EKS In-Place Upgrade from 1.30 to 1.32
+Updated Aug 26
+Raaj Bharath
+Edit
+
+Share
+
+
+EKS In-Place Upgrade from 1.30 to 1.32
+
+
+
+By Gayathri KS
+
+2 min
+
+14
+
+Add a reaction
+Introduction
+This page explains the steps for upgrading EKS clusters in place from version 1.30 to 1.32.
+
+Prerequisites
+Review the release notes for Kubernetes versions 1.31 and 1.32.
+
+Application teams to make sure to replace any deprecated APIs.
+
+Application teams are required to raise the necessary Change Request for the upgrade activity and assign the Change Task to the IOC-CloudEngineering team.
+
+Upgrade Procedure
+Upgrade Cluster
+Upgrade the cluster to 1.31 by modifying the respective terraform code.
+
+Set kubernetes_version = "1.31" in the cluster.tf file.
+
+Add bapp_id as well.
+
+Execute the respective pipeline.
+
+Upgrade the cluster to 1.32 by modifying the respective terraform code.
+
+Set kubernetes_version = "1.32" in the cluster.tf file.
+
+Execute the respective pipeline.
+
+Perform the post deployment steps. Click here for the steps.
+
+Upgrade Nodegroups
+In the respective terraform code for building EKS nodegroup, update the below.
+
+Increment node_group_version by 1. This triggers force replacement of the nodegroup.
+
+Update the variable launch_template_custom_ami to use the latest golden ami (NV: ami-0fd79f7fc6a89e4b7 & OH: ami-057e0eec9b2410e04).
+
+Application teams to validate their applications.
+
+In case of any issues, the node group can be rolled back to the previous AMI. Please refer the Rollback Procedure.
+
+Post Deployment Steps
+Once the cluster is upgraded to 1.32, run the below commands for upgrading the Add-On versions.
+
+Connect to EKS Cluster
+
+Login to the cluster
+
+
+
+export KUBECONFIG=kubeconfig_file_path
+example: export KUBECONFIG=/home/ubuntu/.kube/UAT-CLUSTERS/WAOH-SAP-2-EKS-CL-core-tools-001
+ 
+
+Kube proxy
+
+
+
+kubectl get daemonset kube-proxy --namespace kube-system -o=jsonpath='{$.spec.template.spec.containers[:1].image}'
+kubectl set image daemonset.apps/kube-proxy -n kube-system kube-proxy=602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/kube-proxy:v1.32.0-eksbuild.2
+ 
+
+CoreDNS
+
+
+
+kubectl describe deployment coredns -n kube-system | grep Image | cut -d ":" -f 3
+kubectl set image deployment.apps/coredns -n kube-system  coredns=602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/coredns:v1.11.4-eksbuild.2
+ 
+
+Cluster Auto-scaler
+
+
+
+kubectl describe deployment cluster-autoscaler -n kube-system | grep Image
+kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=registry.k8s.io/autoscaling/cluster-autoscaler:v1.32.1
+ 
+
+AWS CNI
+
+
+
+kubectl get daemonset aws-node -n kube-system -o yaml > aws-k8s-cni-old.yaml
+curl -o aws-k8s-cni.yaml https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.20.1/config/master/aws-k8s-cni.yaml
+sed -i -e 's/us-west-2/us-east-1/' aws-k8s-cni.yaml (Change the region as per your need)
+kubectl apply -f aws-k8s-cni.yaml
+ 
+
+EBS CSI Driver
+
+
+
+kubectl describe deployment ebs-csi-controller -n kube-system | grep Image
+git clone https://github.com/kubernetes-sigs/aws-ebs-csi-driver.git -b release-1.42
+kubectl apply -k aws-ebs-csi-driver/deploy/kubernetes/base/
+ 
+
+EFS CSI Driver
+
+
+
+kubectl describe deployment efs-csi-controller -n kube-system | grep Image
+kubectl kustomize "github.com/kubernetes-sigs/aws-efs-csi-driver/deploy/kubernetes/overlays/stable/ecr/?ref=release-2.1" > driver.yaml
+sed -i 's/602401143452.dkr.ecr.us-west-2.amazonaws.com/602401143452.dkr.ecr.us-east-1.amazonaws.com/g' driver.yaml (Change the region as per your need)
+kubectl apply -f driver.yaml
+Rollback Procedure
+In case of any issues after upgrading to 1.32, the affected nodegroup can be reverted to version 1.30. 
+
+In the respective terraform code for building EKS nodegroup, update the below.
+
+Increment node_group_version by 1. This triggers force replacement of the nodegroup.
+
+Update the variable launch_template_custom_ami to use the previous AMI.
+
+ 
+
+ 
+
+Add label
